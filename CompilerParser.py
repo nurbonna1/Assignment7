@@ -22,8 +22,8 @@ class CompilerParser:
             return False
         token = self.tokens[self.current_index]
         if value is None:
-            return token.type == type_
-        return token.type == type_ and token.value == value
+            return token.getType() == type_
+        return token.getType() == type_ and token.getValue() == value
 
     def mustBe(self, type_, value=None):
         if not self.have(type_, value):
@@ -33,6 +33,8 @@ class CompilerParser:
         return token
 
     def compileProgram(self):
+        if not self.have("keyword", "class"):
+            raise ParseException("Program must start with a class")
         return self.compileClass()
 
     def compileClass(self):
@@ -40,10 +42,13 @@ class CompilerParser:
         tree.addChild(self.mustBe("keyword", "class"))
         tree.addChild(self.mustBe("identifier"))
         tree.addChild(self.mustBe("symbol", "{"))
+
         while self.have("keyword", "static") or self.have("keyword", "field"):
             tree.addChild(self.compileClassVarDec())
+
         while self.have("keyword", "constructor") or self.have("keyword", "function") or self.have("keyword", "method"):
             tree.addChild(self.compileSubroutine())
+
         tree.addChild(self.mustBe("symbol", "}"))
         return tree
 
@@ -53,15 +58,15 @@ class CompilerParser:
         tree.addChild(self.mustBe("keyword"))
         tree.addChild(self.mustBe("identifier"))
         while self.have("symbol", ","):
-            tree.addChild(self.mustBe("symbol", ","))
+            tree.addChild(self.mustBe("symbol"))
             tree.addChild(self.mustBe("identifier"))
         tree.addChild(self.mustBe("symbol", ";"))
         return tree
 
     def compileSubroutine(self):
         tree = ParseTree("subroutine")
-        tree.addChild(self.mustBe("keyword"))
-        tree.addChild(self.mustBe("keyword"))
+        tree.addChild(self.mustBe("keyword"))  # constructor/function/method
+        tree.addChild(self.mustBe("keyword"))  # return type
         tree.addChild(self.mustBe("identifier"))
         tree.addChild(self.mustBe("symbol", "("))
         tree.addChild(self.compileParameterList())
@@ -75,7 +80,7 @@ class CompilerParser:
             tree.addChild(self.mustBe("keyword"))
             tree.addChild(self.mustBe("identifier"))
             while self.have("symbol", ","):
-                tree.addChild(self.mustBe("symbol", ","))
+                tree.addChild(self.mustBe("symbol"))
                 tree.addChild(self.mustBe("keyword"))
                 tree.addChild(self.mustBe("identifier"))
         return tree
@@ -95,7 +100,7 @@ class CompilerParser:
         tree.addChild(self.mustBe("keyword"))
         tree.addChild(self.mustBe("identifier"))
         while self.have("symbol", ","):
-            tree.addChild(self.mustBe("symbol", ","))
+            tree.addChild(self.mustBe("symbol"))
             tree.addChild(self.mustBe("identifier"))
         tree.addChild(self.mustBe("symbol", ";"))
         return tree
@@ -103,7 +108,7 @@ class CompilerParser:
     def compileStatements(self):
         tree = ParseTree("statements")
         while self.have("keyword"):
-            value = self.current().value
+            value = self.current().getValue()
             if value == "let":
                 tree.addChild(self.compileLet())
             elif value == "do":
@@ -189,13 +194,4 @@ class CompilerParser:
             tree.addChild(self.mustBe("symbol", ")"))
         else:
             raise ParseException("Unexpected token in term")
-        return tree
-
-    def compileExpressionList(self):
-        tree = ParseTree("expressionList")
-        if not self.have("symbol", ")"):
-            tree.addChild(self.compileExpression())
-            while self.have("symbol", ","):
-                tree.addChild(self.mustBe("symbol", ","))
-                tree.addChild(self.compileExpression())
         return tree
